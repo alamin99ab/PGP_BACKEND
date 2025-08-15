@@ -25,11 +25,18 @@ const userSchema = mongoose.Schema({
     },
     pgpPublicKey: {
         type: String,
+        required: true, // <-- Public key থাকতেই হবে
+    },
+    // নিচের এই ফিল্ডটি যোগ করা হয়েছে
+    pgpPrivateKey: {
+        type: String,
+        required: true, // <-- Private key থাকতেই হবে
     },
 }, {
     timestamps: true,
 });
 
+// পাসওয়ার্ড সেভ করার আগে হ্যাশ করার কোড (এটি সঠিক আছে)
 userSchema.pre('save', async function(next) {
     if (!this.isModified('password')) {
         next();
@@ -38,6 +45,7 @@ userSchema.pre('save', async function(next) {
     this.password = await bcrypt.hash(this.password, salt);
 });
 
+// পাসওয়ার্ড মেলানোর কোড (এটিও সঠিক আছে)
 userSchema.methods.matchPassword = async function(enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };

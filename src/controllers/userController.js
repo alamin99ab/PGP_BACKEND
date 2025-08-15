@@ -23,14 +23,18 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new Error('Username already taken');
     }
 
+    // PGP কী জেনারেট করার সময় পাসওয়ার্ড ব্যবহার করা হয় private key এনক্রিপ্ট করার জন্য
     const pgpPassphrase = password; 
-    const { publicKeyArmored } = await generatePGPKeyPair(email, pgpPassphrase);
+    
+    // generatePGPKeyPair থেকে public এবং private দুটো কী-ই গ্রহণ করুন
+    const { publicKeyArmored, privateKeyArmored } = await generatePGPKeyPair(email, pgpPassphrase);
 
     const user = await User.create({
         username,
         email,
-        password,
+        password, // <-- User মডেলে পাসওয়ার্ড স্বয়ংক্রিয়ভাবে হ্যাশ হওয়া উচিত (pre-save hook ব্যবহার করে)
         pgpPublicKey: publicKeyArmored,
+        pgpPrivateKey: privateKeyArmored, // <-- Private Key ডাটাবেসে সেভ করুন
     });
 
     if (user) {
@@ -39,6 +43,7 @@ const registerUser = asyncHandler(async (req, res) => {
             username: user.username,
             email: user.email,
             pgpPublicKey: user.pgpPublicKey,
+            // রেজিস্ট্রেশনের সময় private key পাঠানোর দরকার নেই
             token: generateToken(user._id),
         });
     } else {
@@ -59,6 +64,7 @@ const loginUser = asyncHandler(async (req, res) => {
             email: user.email,
             token: generateToken(user._id),
             pgpPublicKey: user.pgpPublicKey,
+            pgpPrivateKey: user.pgpPrivateKey, // <-- লগইনের সময় private key পাঠান
         });
     } else {
         res.status(401);
@@ -67,7 +73,8 @@ const loginUser = asyncHandler(async (req, res) => {
 });
 
 const getUserProfile = asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user._id).select('-password');
+    // প্রোফাইল দেখার সময় private key দেখানোর প্রয়োজন নেই
+    const user = await User.findById(req.user._id).select('-password -pgpPrivateKey');
 
     if (user) {
         res.json({
